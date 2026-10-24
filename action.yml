@@ -27,9 +27,12 @@ runs:
 
         # The sums file lists every volume of this tag's bundle.
         Invoke-WebRequest "$base/SHA256SUMS.txt" -OutFile "$tmp/SHA256SUMS.txt"
-        $volumes = Get-Content "$tmp/SHA256SUMS.txt" |
+        # @() keeps this an array when SHA256SUMS.txt lists a single volume:
+        # a bare pipeline would flatten to a string and [0] would grab the
+        # first CHARACTER, not the first file.
+        $volumes = @(Get-Content "$tmp/SHA256SUMS.txt" |
           Where-Object { $_ -match '\.7z\.\d+$' } |
-          ForEach-Object { ($_ -split '\s+', 2)[1].Trim() }
+          ForEach-Object { ($_ -split '\s+', 2)[1].Trim() })
         if (-not $volumes) { throw "SHA256SUMS.txt lists no .7z volumes for tag $tag" }
 
         foreach ($v in $volumes) {
