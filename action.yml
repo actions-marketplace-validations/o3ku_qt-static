@@ -1,0 +1,53 @@
+name: 'qt-static bundle'
+description: >-
+  Download and extract a prebuilt vcpkg install root (x64-windows-static-md)
+  from this repo's releases. Anonymous download: works in fork PRs too.
+inputs:
+  tag:
+    description: 'Release tag to download (see Releases page). Pinned on purpose: byte-exact and predictable.'
+    required: true
+  dest:
+    description: 'Directory the install root is extracted into (created if missing). Point vcpkg --x-install-root / CMake VCPKG_INSTALLED_DIR at it.'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Fetch and verify bundle
+      shell: pwsh
+      run: |
+        $ErrorActionPreference = 'Stop'
+        $tag = "${{ inputs.tag }}"
+        $dest = "${{ inputs.dest }}"
+        $base = "https://github.com/kkzi/qt-static/releases/download/$tag"
+
+        New-Item -ItemType Directory -Force -Path "$dest" | Out-Null
+        $tmp = Join-Path $env:RUNNER_TEMP "qt-static-$tag"
+        New-Item -ItemType Directory -Force -Path $tmp | Out-Null
+
+        # The sums file lists every volume of this tag's bundle.
+        Invoke-WebRequest "$base/SHA256SUMS.txt" -OutFile "$tmp/SHA256SUMS.txt"
+        $volumes = Get-Content "$tmp/SHA256SUMS.txt" |
+          Where-Object { $_ -match '\.7z\.\d+$' } |
+          ForEach-Object { ($_ -split '\s+', 2)[1].Trim() }
+        if (-not $volumes) { throw "SHA256SUMS.txt lists no .7z volumes for tag $tag" }
+
+        foreach ($v in $volumes) {
+          Invoke-WebRequest "$base/$v" -OutFile "$tmp/$v"
+        }
+
+        # Verify every volume before extracting anything.
+        foreach ($line in Get-Content "$tmp/SHA256SUMS.txt") {
+          if ($line -notmatch '\.7z\.\d+$') { continue }
+          $parts = $line -split '\s+', 2
+          $hash = (Get-FileHash "$tmp/$($parts[1].Trim())" -Algorithm SHA256).Hash
+          if ($hash -ne $parts[0].ToUpper()) { throw "SHA256 mismatch: $($parts[1])" }
+          Write-Host "verified $($parts[1])"
+        }
+
+        # Extracting the first volume pulls in the rest.
+        7z x "$tmp/$($volumes[0])" -o"$dest" -y | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "7z extraction failed" }
+
+        Write-Host "bundle $tag extracted to $dest"
+        Get-ChildItem "$dest" | Select-Object -ExpandProperty Name
