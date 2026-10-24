@@ -1,0 +1,85 @@
+name: build
+
+# Builds a prebuilt vcpkg install root (x64-windows-static-md) and publishes
+# it as release assets. Consumers download the bundle, unzip it as their
+# VCPKG_INSTALLED_DIR, and vcpkg sees the shipped vcpkg/status - so their CI
+# never compiles Qt. Public assets download anonymously; no tokens involved.
+
+on:
+  workflow_dispatch:
+    inputs:
+      bundle:
+        description: 'Which bundle to build'
+        type: choice
+        options: [qt6, qt5]
+        default: qt6
+
+# Never cancel: a killed run wastes the ~1h Qt compile and saves nothing.
+concurrency:
+  group: build-${{ inputs.bundle }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  VCPKG_TRIPLET: x64-windows-static-md
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 240
+
+    steps:
+      - name: Install ports
+        shell: pwsh
+        run: |
+          $ports = switch ("${{ inputs.bundle }}") {
+            'qt6' { @('qtbase','qtsvg','freerdp','cjson','nlohmann-json') }  # o3ku/RdpBox set
+            'qt5' { @('qt5-base','qt5-svg') }                                  # o3ku/SongBird set
+          }
+          Write-Host "ports: $($ports -join ' ')"
+
+          # The image vcpkg lives on C: with limited free space; Qt buildtrees
+          # alone are tens of GB. Keep every write-heavy directory on D:.
+          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install `
+            --triplet=$env:VCPKG_TRIPLET `
+            @ports `
+            --x-install-root="$pwd\installed" `
+            --x-buildtrees-root="D:\vcpkg-buildtrees" `
+            --downloads-root="D:\vcpkg-downloads" `
+            --clean-after-build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          $gb = [math]::Round(((Get-ChildItem -Recurse "$pwd\installed" | Measure-Object Length -Sum).Sum / 1GB), 2)
+          Write-Host "installed root: $gb GB"
+
+      - name: Pack
+        id: pack
+        shell: pwsh
+        run: |
+          $tag = "${{ inputs.bundle }}-win2022-" + (Get-Date -Format yyyyMMdd-HHmm)
+          $name = "vcpkg-$($tag)-x64-windows-static-md"
+
+          # Release assets cap at 2 GiB per file: split into 1.8 GiB volumes.
+          7z a -t7z -mx=7 -v1800m "$name.7z" ".\installed\*"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          Get-ChildItem "$name.7z.*" | ForEach-Object {
+            "{0}  {1}" -f (Get-FileHash $_ -Algorithm SHA256).Hash, $_.Name
+          } | Out-File -Encoding ascii SHA256SUMS.txt
+          Get-Content SHA256SUMS.txt
+
+          "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "name=$name" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Publish release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.pack.outputs.tag }}" `
+            -R kkzi/qt-static `
+            --title "vcpkg bundle ${{ steps.pack.outputs.tag }}" `
+            --notes "Prebuilt vcpkg install root (x64-windows-static-md, windows-2022 image). Unzip as your vcpkg install root; vcpkg reads vcpkg/status and skips these ports. Verify with SHA256SUMS.txt. Built by CI (workflow_dispatch)." `
+            (Get-ChildItem "${{ steps.pack.outputs.name }}.7z.*").FullName SHA256SUMS.txt
