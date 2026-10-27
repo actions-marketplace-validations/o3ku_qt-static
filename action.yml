@@ -19,7 +19,7 @@ runs:
         $ErrorActionPreference = 'Stop'
         $tag = "${{ inputs.tag }}"
         $dest = "${{ inputs.dest }}"
-        $base = "https://github.com/kkzi/qt-static/releases/download/$tag"
+        $base = "https://github.com/o3ku/qt-static/releases/download/$tag"
 
         New-Item -ItemType Directory -Force -Path "$dest" | Out-Null
         $tmp = Join-Path $env:RUNNER_TEMP "qt-static-$tag"

@@ -21,7 +21,7 @@ One line, via this repo's composite action (downloads, verifies SHA256, extracts
 
 ```yaml
 steps:
-  - uses: kkzi/qt-static@main
+  - uses: o3ku/qt-static@main
     with:
       tag: qt6-win2022-20261024-1200   # pick a tag from the Releases page
       dest: ${{ github.workspace }}/vcpkg_installed
@@ -41,7 +41,7 @@ If you prefer no action, plain steps work the same:
 
 ```yaml
   - run: |
-      base=https://github.com/kkzi/qt-static/releases/download/<tag>
+      base=https://github.com/o3ku/qt-static/releases/download/<tag>
       curl -LO $base/SHA256SUMS.txt
       # download every .7z.NNN listed, sha256sum -c, then: 7z x <first volume> -o vcpkg_installed
 ```

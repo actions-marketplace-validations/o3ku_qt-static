@@ -79,7 +79,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "${{ steps.pack.outputs.tag }}" `
-            -R kkzi/qt-static `
+            -R o3ku/qt-static `
             --title "vcpkg bundle ${{ steps.pack.outputs.tag }}" `
             --notes "Prebuilt vcpkg install root (x64-windows-static-md, windows-2022 image). Unzip as your vcpkg install root; vcpkg reads vcpkg/status and skips these ports. Verify with SHA256SUMS.txt. Built by CI (workflow_dispatch)." `
             (Get-ChildItem "${{ steps.pack.outputs.name }}.7z.*").FullName SHA256SUMS.txt
