@@ -1,7 +1,8 @@
 name: 'qt-static bundle'
-description: >-
-  Download and extract a prebuilt vcpkg install root (x64-windows-static-md)
-  from this repo's releases. Anonymous download: works in fork PRs too.
+description: 'Download & extract a prebuilt vcpkg install root (x64-windows-static-md) from releases. Anonymous: fork-PR friendly.'
+branding:
+  icon: 'package'
+  color: 'blue'
 inputs:
   tag:
     description: 'Release tag to download (see Releases page). Pinned on purpose: byte-exact and predictable.'
