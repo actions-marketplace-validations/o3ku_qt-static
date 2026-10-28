@@ -8,23 +8,30 @@ Purpose: **save the ~1-1.5h source compile** that vcpkg otherwise performs the f
 
 Each [Release](../../releases) tag carries one bundle: a 7z archive (split into ≤2GiB volumes) of a complete vcpkg install root — `x64-windows-static-md/` with headers, static libs, CMake config files, plus `vcpkg/status` so vcpkg itself knows the ports are installed. `SHA256SUMS.txt` lists and verifies every volume.
 
-Two bundles exist, built by the same workflow:
+Two bundles exist, built by the same workflow — **pick Qt version via the tag prefix**:
 
-| Bundle | Ports |
-|---|---|
-| `qt6-win2022-*` | qtbase, qtsvg, freerdp, cjson, nlohmann-json |
-| `qt5-win2022-*` | qt5-base, qt5-svg |
+| Bundle / tag prefix | Ports | Use when |
+|---|---|---|
+| `qt6-win2022-*` | qtbase, qtsvg, freerdp, cjson, nlohmann-json | you want Qt 6 |
+| `qt5-win2022-*` | qt5-base, qt5-svg | you need Qt 5 (legacy code) |
 
 ## Use in a GitHub Actions workflow
 
-One line, via this repo's composite action (downloads, verifies SHA256, extracts — anonymous, no tokens, so it also works in fork PRs):
+One line, via this repo's composite action (downloads, verifies SHA256, extracts — anonymous, no tokens, so it also works in fork PRs). **Qt version is chosen by the `tag` prefix** — `qt6-…` or `qt5-…`:
 
 ```yaml
 steps:
-  - uses: o3ku/qt-static@main
+  # Qt 6 (qtbase, qtsvg, freerdp, cjson, nlohmann-json)
+  - uses: o3ku/qt-static@v1
     with:
-      tag: qt6-win2022-20261024-1200   # pick a tag from the Releases page
+      tag: qt6-win2022-20261024-0201   # any tag starting with qt6- from the Releases page
       dest: ${{ github.workspace }}/vcpkg_installed
+
+  # Qt 5 (qt5-base, qt5-svg) — same action, qt5- tag instead:
+  # - uses: o3ku/qt-static@v1
+  #   with:
+  #     tag: qt5-win2022-20261024-0121
+  #     dest: ${{ github.workspace }}/vcpkg_installed
 ```
 
 Then use the tree as your vcpkg install root. With classic vcpkg:
